@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-node-app
+  namespace: argocd
+spec:
+  project: default
+
+  # The source from where the app manifests (Helm/Kustomize/YAML) are fetched.
+  source:
+    repoURL: 'https://github.com/your-repo/k8s-manifests.git'
+    targetRevision: HEAD
+    path: path-to-app-manifests
+
+  # The destination cluster and namespace where the application will be deployed
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  # Define sync policy for automatic deployment
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+
+------------------------------------------------------
+
+#Jenkins + ArgoCD Integrate Jenkins with ArgoCD 
+curl -X POST \
+  -H "Authorization: Bearer <ARGOCD_TOKEN>" \
+  https://argocd-server/api/v1/applications/my-node-app/sync
