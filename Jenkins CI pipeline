@@ -1,0 +1,90 @@
+pipeline {
+    agent any
+
+    environment {
+        // AWS ECR Repository URL (Replace with your AWS Account ID and region)
+        ECR_REPO_URI = '123456789012.dkr.ecr.us-west-2.amazonaws.com/my-node-app'
+        IMAGE_TAG = "${env.BUILD_ID}"
+        AWS_REGION = 'us-west-2'
+        // Docker credentials for ECR (Assumes Jenkins is using AWS credentials)
+        DOCKER_CREDENTIALS_ID = 'ecr-jenkins-credentials' 
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo 'Fetching the latest code from the Git repository...'
+                git 'https://github.com/your-nodejs-repo.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                echo 'Installing the required Node.js dependencies...'
+                sh 'npm install'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                echo 'Running unit tests to ensure code quality...'
+                // You should already have a test script in your package.json file
+                // Ensure that you have a test framework set up like Mocha, Jest, etc.
+                sh 'npm run test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo 'Building the Docker image for the Node.js application...'
+                    sh "docker build -t my-node-app:${IMAGE_TAG} ."
+                }
+            }
+        }
+
+        stage('Login to AWS ECR') {
+            steps {
+                script {
+                    echo 'Authenticating with AWS ECR to push the Docker image...'
+                    // Log in to ECR repository using AWS CLI
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPO_URI}
+                    '''
+                }
+            }
+        }
+
+        stage('Tag and Push Docker Image to ECR') {
+            steps {
+                script {
+                    echo 'Tagging and pushing the Docker image to AWS ECR...'
+                    // Tag and push the Docker image to ECR repository
+                    sh "docker tag my-node-app:${IMAGE_TAG} ${ECR_REPO_URI}:${IMAGE_TAG}"
+                    sh "docker push ${ECR_REPO_URI}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Cleanup Local Docker Images') {
+            steps {
+                echo 'Cleaning up the local Docker images to free up space...'
+                // Clean up Docker images to save local storage
+                sh "docker rmi ${ECR_REPO_URI}:${IMAGE_TAG} || true"
+                sh "docker rmi my-node-app:${IMAGE_TAG} || true"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline execution completed. Check the status for success or failure.'
+        }
+        success {
+            echo 'The build, test, and Docker image push were successful!'
+        }
+        failure {
+            echo 'The build or image push failed. Please check the logs for more details.'
+        }
+    }
+}
